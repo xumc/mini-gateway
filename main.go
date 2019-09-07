@@ -13,8 +13,6 @@ import (
 	"time"
 )
 
-const filtersHeaderKey = "MINI-GATEWAY-FILTERS"
-
 type Server struct {
 	port      int
 	transport http.RoundTripper
@@ -22,50 +20,8 @@ type Server struct {
 	mu        sync.Mutex
 }
 
-type Upstream struct {
-	Host   string
-	Schema string
-}
-
-type Filter interface {
-	GetType() string // "PRE / POST"
-	GetOrder() int
-	ShouldFilter(r *http.Request) (bool, error)
-}
-
-type PreFilter interface {
-	Filter
-	Run(r *http.Request) error
-}
-
-type PostFilter interface {
-	Filter
-	Run(r *http.Request, resp *http.Response, upstreamError error) error
-}
-
-type RouteSpec struct {
-	Path      string
-	Upstreams []Upstream
-	Filters   []string
-}
-
-var routes = []RouteSpec{
-	{
-		Path: "^/svc1/(.*)",
-		Upstreams: []Upstream{
-			{
-				Host:   "localhost:8081",
-				Schema: "http",
-			},
-		},
-		Filters: []string{},
-	},
-}
-
-var registedFilters = map[string]Filter{}
-
 func (s *Server) Director(r *http.Request) {
-	for _, route := range routes {
+	for _, route := range registeredRoutes {
 		reg, err := regexp.Compile(route.Path)
 		if err != nil {
 			fmt.Println("invalid config item, ignore")
@@ -102,7 +58,7 @@ func (s *Server) RoundTrip(r *http.Request) (*http.Response, error) {
 	preFilters := make([]Filter, 0, len(filterNames))
 	postFilters := make([]Filter, 0, len(filterNames))
 	for _, fn := range filterNames {
-		filter := registedFilters[fn]
+		filter := registeredFilters[fn]
 
 		switch filter.GetType() {
 		case "PRE":
