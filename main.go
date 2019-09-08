@@ -57,6 +57,7 @@ func (s *Server) RoundTrip(r *http.Request) (*http.Response, error) {
 		return s.transport.RoundTrip(r)
 	}
 
+	// TODO cache filters to improve performance
 	preFilters := make([]Filter, 0, len(filterNames))
 	postFilters := make([]Filter, 0, len(filterNames))
 	for _, fn := range filterNames {
@@ -113,13 +114,6 @@ func (s *Server) RoundTrip(r *http.Request) (*http.Response, error) {
 	return resp, upstreamError
 }
 
-type mh struct{}
-
-func (m *mh) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	s := "url :" + req.URL.String() + "\n" + time.Now().String()
-	rw.Write([]byte(s))
-}
-
 func main() {
 	server := &Server{
 		port:      8080, // TODO configurable
@@ -135,8 +129,11 @@ func main() {
 		fmt.Printf("can not initialize listener: %+v", err)
 	}
 
+	timeoutHandler := http.TimeoutHandler(proxy, 60*time.Second, "gateway timeout") // TODO configurable
+	rateLimiterHandler := NewRateLimiterHandler(timeoutHandler)
+
 	httpS := &http.Server{
-		Handler: proxy,
+		Handler: rateLimiterHandler,
 	}
 
 	server.running = true

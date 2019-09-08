@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 )
 
@@ -23,6 +22,6 @@ func (a *InspectorFilter) ShouldFilter(r *http.Request) (bool, error) {
 }
 
 func (a *InspectorFilter) Run(r *http.Request, resp *http.Response, upstreamError error) error {
-	fmt.Println("inspector ...")
+	//fmt.Println("inspector ...")
 	return nil
 }

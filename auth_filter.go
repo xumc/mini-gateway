@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 )
 
@@ -23,6 +22,6 @@ func (a *AuthFilter) ShouldFilter(r *http.Request) (bool, error) {
 }
 
 func (a *AuthFilter) Run(r *http.Request) error {
-	fmt.Println("authing ...")
+	//fmt.Println("authing ...")
 	return nil
 }
