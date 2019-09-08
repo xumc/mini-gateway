@@ -26,12 +26,14 @@ func (s *Server) Director(r *http.Request) {
 		if err != nil {
 			fmt.Println("invalid config item, ignore")
 		}
-		if reg.NumSubexp() == 0 {
+
+		matched := reg.MatchString(r.URL.Path)
+		if !matched {
 			continue
 		}
 
-		upstreamPath := reg.SubexpNames()[0]
-		r.URL.Path = upstreamPath
+		subMatches := reg.FindStringSubmatch(r.URL.Path)
+		r.URL.Path = "/" + subMatches[1]
 
 		// random select one upstream
 		index := rand.Intn(len(route.Upstreams))
@@ -114,7 +116,8 @@ func (s *Server) RoundTrip(r *http.Request) (*http.Response, error) {
 type mh struct{}
 
 func (m *mh) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	rw.Write([]byte("hello world" + time.Now().String()))
+	s := "url :" + req.URL.String() + "\n" + time.Now().String()
+	rw.Write([]byte(s))
 }
 
 func main() {
