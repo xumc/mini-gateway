@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package proto;
+
+service GrpcUpstreamService {
+    rpc Hello (Request) returns (Reply);
+}
+
+message Request {
+    string hello = 1;
+}
+
+message Reply {
+    string world = 1;
+}

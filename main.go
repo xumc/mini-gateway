@@ -14,10 +14,11 @@ import (
 )
 
 type Server struct {
-	port      int
-	transport http.RoundTripper
-	running   bool
-	mu        sync.Mutex
+	port          int
+	httpTransport http.RoundTripper
+	grpcTransport GrpcTransport
+	running       bool
+	mu            sync.Mutex
 }
 
 func (s *Server) Director(r *http.Request) {
@@ -32,15 +33,17 @@ func (s *Server) Director(r *http.Request) {
 			continue
 		}
 
-		subMatches := reg.FindStringSubmatch(r.URL.Path)
-		r.URL.Path = "/" + subMatches[1]
-
 		// random select one upstream
 		index := rand.Intn(len(route.Upstreams))
 		upstream := route.Upstreams[index]
 
 		r.URL.Host = upstream.Host
 		r.URL.Scheme = upstream.Schema
+
+		if upstream.Schema != "grpc" {
+			subMatches := reg.FindStringSubmatch(r.URL.Path)
+			r.URL.Path = "/" + subMatches[1]
+		}
 
 		r.Header.Set(filtersHeaderKey, strings.Join(route.Filters, ","))
 
@@ -54,7 +57,7 @@ func (s *Server) RoundTrip(r *http.Request) (*http.Response, error) {
 	filterNames := strings.Split(r.Header.Get(filtersHeaderKey), ",")
 	r.Header.Del(filtersHeaderKey)
 	if len(filterNames) == 1 && filterNames[0] == "" {
-		return s.transport.RoundTrip(r)
+		filterNames = []string{}
 	}
 
 	// TODO cache filters to improve performance
@@ -92,7 +95,14 @@ func (s *Server) RoundTrip(r *http.Request) (*http.Response, error) {
 		}
 	}
 
-	resp, upstreamError := s.transport.RoundTrip(r)
+	var resp *http.Response
+	var upstreamError error
+
+	if r.URL.Scheme == "grpc" {
+		resp, upstreamError = s.grpcTransport.RoundTrip(r)
+	} else {
+		resp, upstreamError = s.httpTransport.RoundTrip(r)
+	}
 
 	sort.Slice(postFilters, filterSorter)
 
@@ -116,10 +126,11 @@ func (s *Server) RoundTrip(r *http.Request) (*http.Response, error) {
 
 func main() {
 	server := &Server{
-		port:      8080, // TODO configurable
-		transport: http.DefaultTransport,
-		running:   false,
-		mu:        sync.Mutex{},
+		port:          8080, // TODO configurable
+		httpTransport: http.DefaultTransport,
+		grpcTransport: &DefaultGrpcTransport{},
+		running:       false,
+		mu:            sync.Mutex{},
 	}
 
 	proxy := &httputil.ReverseProxy{Director: server.Director, Transport: server}
@@ -138,7 +149,7 @@ func main() {
 
 	server.running = true
 
-	go http.ListenAndServe(":8081", &mh{})
+	go StartMockUpstreamServer()
 
 	fmt.Println(httpS.Serve(l))
 }
