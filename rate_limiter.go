@@ -25,7 +25,7 @@ func NewRateLimiterHandler(next http.Handler) http.Handler {
 		lims: make(map[condition]*rate.Limiter),
 	}
 
-	lim := rate.NewLimiter(rate.Limit(1), 1) // TODO configurable
+	lim := rate.NewLimiter(rate.Limit(100), 100) // TODO configurable
 	con := condition{ip: "127.0.0.1"}
 
 	limHandler.lims[con] = lim

@@ -23,9 +23,18 @@ type GrpcTransport interface {
 }
 
 // TODO we should use connection pool to improve performance, but you know, its a prototype project now.
-type DefaultGrpcTransport struct{}
+type defaultGrpcTransport struct {
+	conns map[string]*grpc.ClientConn
+	// TODO add rwmutex for conns
+}
 
-func (g *DefaultGrpcTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func NewDefaultGrpcTransport() GrpcTransport {
+	return &defaultGrpcTransport{
+		conns: make(map[string]*grpc.ClientConn),
+	}
+}
+
+func (g *defaultGrpcTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.URL.RawQuery != "" {
 		str, err := g.transformRawQueryToBodyJson(req.URL.RawQuery)
 		if err != nil {
@@ -55,7 +64,7 @@ func (g *DefaultGrpcTransport) RoundTrip(req *http.Request) (*http.Response, err
 	return resp, nil
 }
 
-func (g *DefaultGrpcTransport) transformRawQueryToBodyJson(rq string) (string, error) {
+func (g *defaultGrpcTransport) transformRawQueryToBodyJson(rq string) (string, error) {
 	// TODO this is a simplest transformer, we'd better build a enhanced one.
 	m := make(map[string]string)
 
@@ -77,7 +86,7 @@ func (g *DefaultGrpcTransport) transformRawQueryToBodyJson(rq string) (string, e
 	return string(ret), nil
 }
 
-func (g *DefaultGrpcTransport) invokeRPC(reqContent, target, symbol string) (string, error) {
+func (g *defaultGrpcTransport) invokeRPC(reqContent, target, symbol string) (string, error) {
 	ctx := context.Background()
 
 	dial := func() *grpc.ClientConn {
@@ -95,7 +104,13 @@ func (g *DefaultGrpcTransport) invokeRPC(reqContent, target, symbol string) (str
 
 	md := grpcurl.MetadataFromHeaders([]string{})
 	refCtx := metadata.NewOutgoingContext(ctx, md)
-	cc = dial()
+
+	if conn, ok := g.conns[target]; !ok {
+		cc = dial()
+		g.conns[target] = cc
+	} else {
+		cc = conn
+	}
 	refClient = grpcreflect.NewClient(refCtx, reflectpb.NewServerReflectionClient(cc))
 	descSource = grpcurl.DescriptorSourceFromServer(ctx, refClient)
 
@@ -118,10 +133,6 @@ func (g *DefaultGrpcTransport) invokeRPC(reqContent, target, symbol string) (str
 	}
 
 	// Invoke an RPC
-	if cc == nil {
-		cc = dial()
-	}
-
 	in := strings.NewReader(reqContent)
 
 	rf, formatter, err := grpcurl.RequestParserAndFormatterFor(grpcurl.Format("json"), descSource, false, true, in)

@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	_ "net/http/pprof"
 	"regexp"
 	"sort"
 	"strings"
@@ -130,7 +131,7 @@ func main() {
 	server := &Server{
 		port:          8080, // TODO configurable
 		httpTransport: http.DefaultTransport,
-		grpcTransport: &DefaultGrpcTransport{},
+		grpcTransport: NewDefaultGrpcTransport(),
 		running:       false,
 		mu:            sync.Mutex{},
 	}
@@ -153,6 +154,8 @@ func main() {
 
 	go StartMockUpstreamServer()
 
+	//go http.ListenAndServe("0.0.0.0:8085", nil)
+
 	fmt.Println(httpS.Serve(l))
 }
 
@@ -173,4 +176,17 @@ func setOriginHeader(r *http.Request) {
 			r.URL.Host = r.Host
 		}
 	}
+}
+
+func timeMonitor(f func()) {
+	begin := time.Now()
+
+	//cpuf, err := os.Create("/Users/xumc/go/src/github.com/xumc/mini-gateway/cpu_profile")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//pprof.StartCPUProfile(cpuf)
+	//defer pprof.StopCPUProfile()
+	//f()
+	fmt.Printf("it speeds: %s\n", time.Now().Sub(begin).String())
 }
