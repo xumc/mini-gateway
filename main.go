@@ -43,6 +43,8 @@ func (s *Server) Director(r *http.Request) {
 		if upstream.Schema != "grpc" {
 			subMatches := reg.FindStringSubmatch(r.URL.Path)
 			r.URL.Path = "/" + subMatches[1]
+		} else {
+			r.Method = upstream.GrpcEndPoint
 		}
 
 		r.Header.Set(filtersHeaderKey, strings.Join(route.Filters, ","))

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/fullstorydev/grpcurl"
@@ -25,9 +26,22 @@ type GrpcTransport interface {
 type DefaultGrpcTransport struct{}
 
 func (g *DefaultGrpcTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	reqContent := "{\"hello\":\"你好\"}"
-	target := "localhost:8081"
-	symbol := "proto.GrpcUpstreamService/Hello"
+	if req.URL.RawQuery != "" {
+		str, err := g.transformRawQueryToBodyJson(req.URL.RawQuery)
+		if err != nil {
+			return nil, err
+		}
+		req.Body = ioutil.NopCloser(bytes.NewBufferString(str))
+	}
+
+	reqBytes, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return nil, err
+	}
+	reqContent := string(reqBytes)
+
+	target := req.URL.Host
+	symbol := req.Method
 
 	respStr, err := g.invokeRPC(reqContent, target, symbol)
 	resp := &http.Response{}
@@ -39,6 +53,28 @@ func (g *DefaultGrpcTransport) RoundTrip(req *http.Request) (*http.Response, err
 	resp.Body = ioutil.NopCloser(bytes.NewBufferString(respStr))
 
 	return resp, nil
+}
+
+func (g *DefaultGrpcTransport) transformRawQueryToBodyJson(rq string) (string, error) {
+	// TODO this is a simplest transformer, we'd better build a enhanced one.
+	m := make(map[string]string)
+
+	kvs := strings.Split(rq, "&")
+
+	for _, kv := range kvs {
+		kvc := strings.Split(kv, "=")
+		k := kvc[0]
+		v := kvc[1]
+
+		m[k] = v
+	}
+
+	ret, err := json.Marshal(m)
+	if err != nil {
+		return "", err
+	}
+
+	return string(ret), nil
 }
 
 func (g *DefaultGrpcTransport) invokeRPC(reqContent, target, symbol string) (string, error) {
