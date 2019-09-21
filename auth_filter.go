@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 )
 
 func init() {
@@ -22,6 +24,8 @@ func (a *AuthFilter) ShouldFilter(r *http.Request) (bool, error) {
 }
 
 func (a *AuthFilter) Run(r *http.Request) error {
-	//fmt.Println("authing ...")
+	fmt.Println("authing ...")
+	time.Sleep(5 * time.Second)
+	fmt.Println("auth done")
 	return nil
 }
