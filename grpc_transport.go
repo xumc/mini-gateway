@@ -111,24 +111,27 @@ func (g *defaultGrpcTransport) invokeRPC(reqContent, target, symbol string) (str
 	} else {
 		cc = conn
 	}
+
 	refClient = grpcreflect.NewClient(refCtx, reflectpb.NewServerReflectionClient(cc))
+	// TODO we might cache descSource periodically to improve performance
 	descSource = grpcurl.DescriptorSourceFromServer(ctx, refClient)
 
 	// arrange for the RPCs to be cleanly shutdown
-	reset := func() {
-		if refClient != nil {
-			refClient.Reset()
-			refClient = nil
-		}
-		if cc != nil {
-			cc.Close()
-			cc = nil
-		}
-	}
-	defer reset()
+	//reset := func() {
+	//if refClient != nil {
+	//	refClient.Reset()
+	//	refClient = nil
+	//}
+	//if cc != nil {
+	//cc.Close()
+	//cc = nil
+	//}
+	//}
+	//defer reset()
+
 	exit := func(code int) {
 		// since defers aren't run by os.Exit...
-		reset()
+		//reset()
 		os.Exit(code)
 	}
 

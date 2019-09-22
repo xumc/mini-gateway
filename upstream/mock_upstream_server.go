@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/soheilhy/cmux"
 	"github.com/xumc/mini-gateway/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"log"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 )
 
@@ -38,28 +38,28 @@ func StartMockUpstreamServer() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	grpcServer := grpc.NewServer()
+	m := cmux.New(lis)
 
+	grpcL := m.MatchWithWriters(cmux.HTTP2MatchHeaderFieldSendSettings("content-type", "application/grpc"))
+	httpL := m.Match(cmux.HTTP1Fast())
+
+	grpcServer := grpc.NewServer()
 	proto.RegisterGrpcUpstreamServiceServer(grpcServer, &GrpcMockServer{})
 	reflection.Register(grpcServer)
 
-	wg := sync.WaitGroup{}
-	wg.Add(2)
 	go func() {
-		defer wg.Done()
-		err = grpcServer.Serve(lis)
+		err = grpcServer.Serve(grpcL)
 		if err != nil {
 			panic(fmt.Sprintf("can not serve grpc %s", err.Error()))
 		}
 	}()
 
 	go func() {
-		defer wg.Done()
-		err := http.Serve(lis, &mh{})
+		err := http.Serve(httpL, &mh{})
 		if err != nil {
 			panic(fmt.Sprintf("can not serve http %s", err.Error()))
 		}
 	}()
 
-	wg.Wait()
+	fmt.Println(m.Serve())
 }
